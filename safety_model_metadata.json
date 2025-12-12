@@ -1,0 +1,104 @@
+{
+  "features": [
+    "7d_return",
+    "30d_return",
+    "90d_return",
+    "index_30d_ret",
+    "alpha_30d",
+    "alpha_90d",
+    "corr_30",
+    "index_7d_ret",
+    "index_90d_ret",
+    "marketCap",
+    "trailingPE",
+    "priceToBook",
+    "beta",
+    "SMA_20",
+    "SMA_50"
+  ],
+  "tickers_used": [
+    "RELIANCE",
+    "TCS",
+    "INFY",
+    "ICICIBANK",
+    "HDFCBANK",
+    "SBIN",
+    "ITC",
+    "KOTAKBANK",
+    "LT",
+    "MARUTI",
+    "HCLTECH",
+    "WIPRO",
+    "ASIANPAINT",
+    "SUNPHARMA",
+    "ULTRACEMCO",
+    "TITAN"
+  ],
+  "feature_importance": [
+    {
+      "feature": "SMA_50",
+      "importance": 0.21778775280313506
+    },
+    {
+      "feature": "alpha_30d",
+      "importance": 0.15433139998356438
+    },
+    {
+      "feature": "SMA_20",
+      "importance": 0.1034652615475033
+    },
+    {
+      "feature": "alpha_90d",
+      "importance": 0.08890352076019789
+    },
+    {
+      "feature": "index_90d_ret",
+      "importance": 0.06218786563566809
+    },
+    {
+      "feature": "corr_30",
+      "importance": 0.061986551396146075
+    },
+    {
+      "feature": "90d_return",
+      "importance": 0.054644232752774816
+    },
+    {
+      "feature": "priceToBook",
+      "importance": 0.051356612689118064
+    },
+    {
+      "feature": "index_30d_ret",
+      "importance": 0.04920264146833256
+    },
+    {
+      "feature": "marketCap",
+      "importance": 0.03849175131962766
+    },
+    {
+      "feature": "beta",
+      "importance": 0.035311998417661535
+    },
+    {
+      "feature": "30d_return",
+      "importance": 0.027822601318817884
+    },
+    {
+      "feature": "7d_return",
+      "importance": 0.020539209689640358
+    },
+    {
+      "feature": "trailingPE",
+      "importance": 0.01933193640175246
+    },
+    {
+      "feature": "index_7d_ret",
+      "importance": 0.01463666381605972
+    }
+  ],
+  "model_performance": {
+    "rmse": 0.15334208940562508,
+    "r2": 0.795655844300977,
+    "class_acc": 0.8883564925730714
+  }
+}
