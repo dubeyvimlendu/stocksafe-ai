@@ -67,7 +67,7 @@ def add_technical_indicators(df):
 def compute_market_features(stock_df, index_df):
     out = {}
     price = stock_df["Close"]
-    idx = index_df["Close"].reindex(price.index).fillna(method="ffill")
+    idx = index_df["Close"].reindex(price.index).ffill()
 
     # Index returns
     out["index_7d_ret"] = idx.pct_change(7)

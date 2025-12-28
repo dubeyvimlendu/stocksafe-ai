@@ -1,17 +1,24 @@
 # ai_news.py
+
 import requests
 import nltk
+import joblib
+import streamlit as st
 from nltk.sentiment import SentimentIntensityAnalyzer
 
-# ---------------------------
-# 🔐 HARD-CODED API KEY
-# ---------------------------
-import streamlit as st
-NEWS_API_KEY = st.secrets["NEWS_API_KEY"]   # ← replace this
+# ======================================================
+# CONFIG
+# ======================================================
 
-# ---------------------------
-#  DOWNLOAD VADER IF MISSING
-# ---------------------------
+NEWS_API_KEY = st.secrets["NEWS_API_KEY"]
+
+MODEL_PATH = "models/news_sentiment_model.joblib"
+VECTORIZER_PATH = "models/news_vectorizer.joblib"
+
+sentiment_model = joblib.load(MODEL_PATH)
+vectorizer = joblib.load(VECTORIZER_PATH)
+
+# Download VADER if missing
 try:
     nltk.data.find("sentiment/vader_lexicon.zip")
 except:
@@ -19,96 +26,79 @@ except:
 
 sia = SentimentIntensityAnalyzer()
 
-# ============================================================
-# 1) Fetch Top 5 Latest News
-# ============================================================
-def fetch_recent_news(company):
-    """
-    Fetch top 5 latest financial/news headlines for this company.
-    Uses NewsAPI.
-    """
+# ======================================================
+# FETCH NEWS
+# ======================================================
 
+def fetch_recent_news(company):
     if not NEWS_API_KEY:
-        print("❌ ERROR: Missing NEWS_API_KEY")
         return []
 
     url = (
         "https://newsapi.org/v2/everything?"
         f"q={company} OR {company} stock OR {company} shares&"
-        "language=en&"
-        "sortBy=publishedAt&"
-        "pageSize=5&"
+        "language=en&sortBy=publishedAt&pageSize=5&"
         f"apiKey={NEWS_API_KEY}"
     )
 
     try:
-        response = requests.get(url)
-        data = response.json()
-
-        if "articles" not in data:
-            return []
-
-        return [article["title"] for article in data["articles"]]
-
-    except Exception as e:
-        print("❌ NewsAPI error:", e)
+        res = requests.get(url)
+        data = res.json()
+        return [a["title"] for a in data.get("articles", [])]
+    except:
         return []
 
-# ============================================================
-# 2) VADER Sentiment Analysis
-# ============================================================
-def analyze_news_sentiment(headlines):
-    """
-    Analyze sentiment without using Gemini.
-    Output:
-    - summary
-    - sentiment category
-    - score
-    - risks
-    - opportunities
-    """
+# ======================================================
+# VADER SENTIMENT
+# ======================================================
 
+def vader_sentiment(headlines):
     if not headlines:
-        return {
-            "summary": "No recent news about this company.",
-            "sentiment": "Neutral",
-            "score": 0,
-            "risks": [],
-            "opportunities": []
-        }
+        return {"score": 0, "sentiment": "Neutral"}
 
-    # Sentiment score for each headline
     scores = [sia.polarity_scores(h)["compound"] for h in headlines]
-    avg_score = sum(scores) / len(scores)
+    avg = sum(scores) / len(scores)
 
-    # Category
-    if avg_score > 0.2:
-        senti = "Positive"
-    elif avg_score < -0.2:
-        senti = "Negative"
+    if avg > 0.2:
+        sentiment = "Positive"
+    elif avg < -0.2:
+        sentiment = "Negative"
     else:
-        senti = "Neutral"
-
-    # Simple keyword-based risks & opportunities
-    risks = [
-        h for h in headlines
-        if any(w in h.lower() for w in ["fall", "loss", "down", "fraud", "decline", "risk"])
-    ]
-
-    opportunities = [
-        h for h in headlines
-        if any(w in h.lower() for w in ["rise", "gain", "profit", "growth", "beats", "surge"])
-    ]
-
-    summary = (
-        f"Based on {len(headlines)} recent news items, "
-        f"overall sentiment is **{senti}** with a score of **{avg_score:.2f}**."
-    )
+        sentiment = "Neutral"
 
     return {
-        "summary": summary,
-        "sentiment": senti,
-        "score": round(avg_score, 2),
-        "risks": risks,
-        "opportunities": opportunities
+        "score": round(avg, 2),
+        "sentiment": sentiment
+    }
+
+# ======================================================
+# ML SENTIMENT
+# ======================================================
+
+def ml_sentiment_score(headlines):
+    if not headlines:
+        return 0.5
+
+    text = " ".join(headlines)
+    vec = vectorizer.transform([text])
+    return float(sentiment_model.predict_proba(vec)[0][1])
+
+# ======================================================
+# FINAL NEWS INTELLIGENCE
+# ======================================================
+
+def get_news_analysis(company):
+    headlines = fetch_recent_news(company)
+
+    vader = vader_sentiment(headlines)
+    ml_score = ml_sentiment_score(headlines)
+
+    final_score = (0.6 * ml_score) + (0.4 * ((vader["score"] + 1) / 2))
+
+    return {
+        "headlines": headlines,
+        "sentiment": vader["sentiment"],
+        "vader_score": vader["score"],
+        "ml_score": round(ml_score, 3),
+        "final_score": round(final_score, 3)
     }

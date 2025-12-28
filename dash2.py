@@ -5,7 +5,8 @@ from stock_data import get_company_info, get_company_history
 from list import full_company_df
 from utils import format_indian
 from predict_safety import predict_safety
-from ai_news import fetch_recent_news, analyze_news_sentiment
+from ai_news import get_news_analysis
+
 
 # ================================================================
 # PAGE CONFIG
@@ -26,7 +27,7 @@ def cached_price_history(symbol):
 
 @st.cache_data(ttl=1800)
 def cached_news(company):
-    return fetch_recent_news(company)
+    return get_news_analysis(company)
 
 @st.cache_data(ttl=3600)
 def cached_safety(symbol):
@@ -131,7 +132,8 @@ if data is not None and not data.empty:
     fig.add_trace(go.Scatter(x=data.index, y=data['SMA50'], name="SMA 50"))
 
     fig.update_layout(height=500, template="plotly_white", xaxis_rangeslider_visible=False)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
+
 
 # ================================================================
 # SAFETY + NEWS
@@ -156,43 +158,110 @@ with left:
 # ---------- NEWS ----------
 with right:
     st.markdown("### 📰 Latest News")
-    headlines = cached_news(company)
 
-    if headlines:
-        for h in headlines[:5]:
-            st.markdown(
-                f"<div class='news-card'><strong>{h}</strong></div>",
-                unsafe_allow_html=True
-            )
+    news_data = get_news_analysis(company)
 
-        senti = analyze_news_sentiment(headlines)
-        st.metric("Sentiment", senti["sentiment"], delta=senti["score"])
-    else:
-        st.info("No recent news found")
+    st.metric(
+        "Sentiment",
+        news_data["sentiment"],
+        delta=round(news_data["final_score"], 2)
+    )
+
+    for h in news_data["headlines"]:
+        st.markdown(
+            f"""
+            <div class="news-card">
+                <div class="news-title">{h}</div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+
 
 # ================================================================
-# AI CHAT (NO API CALLS HERE)
+# AI Investment Assistant (Smart Version)
 # ================================================================
+
 st.markdown("<div class='section-header'>💬 AI Investment Assistant</div>", unsafe_allow_html=True)
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Display chat history
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-prompt = st.chat_input("Ask about buy/sell/risk...")
+prompt = st.chat_input("Ask about buy/sell, risk, or outlook...")
 
+def make_reply(question, safety_data, news_data):
+    score = safety_data["score"]
+    market_score = safety_data["market_score"]
+    news_score = safety_data["news_score"]
+    sentiment = news_data["sentiment"]
+
+    question = question.lower()
+
+    # ---------------- BUY / INVEST ----------------
+    if "buy" in question or "invest" in question:
+        if score >= 0.75:
+            return (
+                "✅ **Strong Buy Signal**\n\n"
+                f"• Overall score: {score}\n"
+                f"• Market trend is strong\n"
+                f"• News sentiment is **{sentiment}**\n\n"
+                "This stock looks suitable for accumulation."
+            )
+        elif score >= 0.4:
+            return (
+                "⚠️ **Moderate Opportunity**\n\n"
+                f"• Score: {score}\n"
+                "• Some volatility present\n"
+                "• SIP or partial entry recommended."
+            )
+        else:
+            return (
+                "🚨 **High Risk**\n\n"
+                "• Weak market structure\n"
+                "• Negative or unstable sentiment\n"
+                "• Avoid fresh positions for now."
+            )
+
+    # ---------------- RISK ----------------
+    if "risk" in question:
+        return (
+            f"📉 **Risk Analysis**\n\n"
+            f"• Market Risk Score: {market_score}\n"
+            f"• News Sentiment: {sentiment}\n"
+            "• Risk comes from volatility & recent momentum\n"
+        )
+
+    # ---------------- TARGET / FUTURE ----------------
+    if "target" in question or "future" in question:
+        return (
+            "📊 **Outlook Summary**\n\n"
+            "This projection is based on:\n"
+            "• Market momentum\n"
+            "• News sentiment\n"
+            "• Historical price behavior\n\n"
+            "⚠️ Not a price prediction, but a risk-adjusted outlook."
+        )
+
+    # ---------------- DEFAULT ----------------
+    return (
+        "🤖 You can ask things like:\n"
+        "• Is this stock safe to buy?\n"
+        "• What is the risk level?\n"
+        "• Should I invest now?\n"
+        "• What does sentiment say?\n"
+    )
+
+# Handle input
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
 
-    if "buy" in prompt.lower():
-        reply = "Safe for accumulation." if safety["score"] >= 0.7 else "Moderate risk — SIP preferred."
-    elif "risk" in prompt.lower():
-        reply = "Risk driven by volatility and sentiment."
-    else:
-        reply = "Use safety score and sentiment together."
+    reply = make_reply(prompt, safety, news_data)
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
 
